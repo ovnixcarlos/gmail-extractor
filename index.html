@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Gmail Extractor — Toto Calzados</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f7f7f5;
+    --surface: #ffffff;
+    --border: #e4e2dc;
+    --text: #1a1a18;
+    --muted: #6b6b67;
+    --accent: #1a56db;
+    --accent-bg: #eff4ff;
+    --accent-border: #c3d4fa;
+    --success: #0f7b55;
+    --success-bg: #ecfdf5;
+    --success-border: #a7f0d2;
+    --error: #b91c1c;
+    --error-bg: #fef2f2;
+    --error-border: #fecaca;
+    --radius: 10px;
+    --radius-sm: 6px;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 3rem 1rem;
+  }
+
+  .wrapper { width: 100%; max-width: 520px; }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 2rem;
+  }
+
+  .logo-icon {
+    width: 36px; height: 36px;
+    background: var(--accent);
+    border-radius: var(--radius-sm);
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .logo-icon svg { width: 18px; height: 18px; fill: white; }
+
+  .logo-text { font-size: 15px; font-weight: 600; letter-spacing: -0.02em; color: var(--text); }
+  .logo-sub { font-size: 12px; color: var(--muted); margin-top: 1px; }
+
+  h1 { font-size: 22px; font-weight: 600; letter-spacing: -0.03em; margin-bottom: 6px; }
+  .subtitle { font-size: 14px; color: var(--muted); margin-bottom: 2rem; line-height: 1.5; }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    transition: opacity 0.2s;
+  }
+
+  .card.disabled { opacity: 0.45; pointer-events: none; }
+
+  .card-title {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 1rem;
+  }
+
+  .field { margin-bottom: 1rem; }
+  .field:last-of-type { margin-bottom: 0; }
+
+  label {
+    display: block;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--muted);
+    margin-bottom: 5px;
+  }
+
+  input[type="text"],
+  input[type="datetime-local"] {
+    width: 100%;
+    height: 38px;
+    padding: 0 12px;
+    font-size: 14px;
+    color: var(--text);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    outline: none;
+    transition: border-color 0.15s;
+    font-family: inherit;
+  }
+
+  input:focus { border-color: var(--accent); background: #fff; }
+
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+  .btn {
+    width: 100%;
+    height: 40px;
+    font-size: 14px;
+    font-weight: 500;
+    border-radius: var(--radius-sm);
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: opacity 0.15s, transform 0.1s;
+    font-family: inherit;
+  }
+
+  .btn:active { transform: scale(0.98); }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  .btn-primary { background: var(--accent); color: #fff; margin-top: 1.25rem; }
+  .btn-primary:hover:not(:disabled) { opacity: 0.88; }
+
+  .btn-success { background: var(--success); color: #fff; margin-top: 8px; }
+  .btn-success:hover:not(:disabled) { opacity: 0.88; }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 20px;
+    background: var(--success-bg);
+    color: var(--success);
+    border: 1px solid var(--success-border);
+    margin-left: 8px;
+    vertical-align: middle;
+  }
+
+  .status {
+    font-size: 13px;
+    padding: 10px 14px;
+    border-radius: var(--radius-sm);
+    margin-top: 1rem;
+    line-height: 1.5;
+    display: none;
+  }
+
+  .status.show { display: block; }
+  .status.info { background: var(--accent-bg); color: var(--accent); border: 1px solid var(--accent-border); }
+  .status.success { background: var(--success-bg); color: var(--success); border: 1px solid var(--success-border); }
+  .status.error { background: var(--error-bg); color: var(--error); border: 1px solid var(--error-border); }
+
+  .metrics {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 1rem;
+  }
+
+  .metric {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 14px;
+    text-align: center;
+  }
+
+  .metric-num { font-size: 28px; font-weight: 600; letter-spacing: -0.04em; color: var(--text); }
+  .metric-label { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+  .email-list {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    max-height: 220px;
+    overflow-y: auto;
+    background: var(--bg);
+  }
+
+  .email-item {
+    padding: 8px 12px;
+    font-size: 13px;
+    color: var(--text);
+    border-bottom: 1px solid var(--border);
+    font-family: 'SF Mono', 'Fira Mono', monospace;
+  }
+
+  .email-item:last-child { border-bottom: none; }
+
+  .list-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+
+  .list-header span { font-size: 13px; color: var(--muted); }
+
+  #resultsCard { display: none; }
+
+  .spinner {
+    width: 14px; height: 14px;
+    border: 2px solid rgba(255,255,255,0.4);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    display: none;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<div class="wrapper">
+
+  <div class="logo">
+    <div class="logo-icon">
+      <svg viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+    </div>
+    <div>
+      <div class="logo-text">Gmail Extractor</div>
+      <div class="logo-sub">Toto Calzados</div>
+    </div>
+  </div>
+
+  <h1>Extraer remitentes <span id="connectedBadge" style="display:none;" class="badge">✓ conectado</span></h1>
+  <p class="subtitle">Conectate con Gmail, elegí la etiqueta y el rango de fechas, y descargá el CSV con todos los remitentes únicos.</p>
+
+  <div class="card" id="authCard">
+    <div class="card-title">1 — Autenticación</div>
+    <div class="field">
+      <label>Client ID de Google</label>
+      <input type="text" id="clientId" value="593427555359-1trgsqma3tu0r6na21n9vo47j0jjik2u.apps.googleusercontent.com" />
+    </div>
+    <button class="btn btn-primary" id="btnAuth" onclick="handleAuth()">
+      Conectar con Google
+    </button>
+  </div>
+
+  <div class="card disabled" id="searchCard">
+    <div class="card-title">2 — Búsqueda</div>
+    <div class="field">
+      <label>Etiqueta de Gmail</label>
+      <input type="text" id="labelInput" value="Carrito abandonado" />
+    </div>
+    <div class="row">
+      <div class="field">
+        <label>Desde</label>
+        <input type="datetime-local" id="dateFrom" value="2025-06-01T01:00" />
+      </div>
+      <div class="field">
+        <label>Hasta</label>
+        <input type="datetime-local" id="dateTo" value="2025-06-08T23:30" />
+      </div>
+    </div>
+    <button class="btn btn-primary" id="btnSearch" onclick="handleSearch()">
+      <span id="btnSearchText">Extraer remitentes</span>
+      <div class="spinner" id="searchSpinner"></div>
+    </button>
+  </div>
+
+  <div id="statusArea">
+    <div class="status" id="statusMsg"></div>
+  </div>
+
+  <div class="card" id="resultsCard">
+    <div class="card-title">3 — Resultados</div>
+    <div class="metrics">
+      <div class="metric">
+        <div class="metric-num" id="totalEmails">0</div>
+        <div class="metric-label">mails procesados</div>
+      </div>
+      <div class="metric">
+        <div class="metric-num" id="uniqueEmails">0</div>
+        <div class="metric-label">remitentes únicos</div>
+      </div>
+    </div>
+    <div class="list-header">
+      <span id="resultsLabel">Remitentes encontrados</span>
+    </div>
+    <div class="email-list" id="emailList"></div>
+    <button class="btn btn-success" onclick="downloadCSV()">
+      Descargar CSV
+    </button>
+  </div>
+
+</div>
+
+<script>
+  const SCOPES = 'https://www.googleapis.com/auth/gmail.readonly';
+  let tokenClient;
+  let accessToken = null;
+  let allEmails = [];
+
+  function setStatus(msg, type = 'info') {
+    const el = document.getElementById('statusMsg');
+    el.className = 'status show ' + type;
+    el.textContent = msg;
+  }
+
+  function handleAuth() {
+    const clientId = document.getElementById('clientId').value.trim();
+    if (!clientId) { setStatus('Ingresá el Client ID.', 'error'); return; }
+    tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: clientId,
+      scope: SCOPES,
+      callback: (response) => {
+        if (response.error) { setStatus('Error: ' + response.error, 'error'); return; }
+        accessToken = response.access_token;
+        document.getElementById('connectedBadge').style.display = 'inline-flex';
+        document.getElementById('authCard').classList.add('disabled');
+        document.getElementById('searchCard').classList.remove('disabled');
+        setStatus('Autenticado correctamente. Configurá la búsqueda y extraé los remitentes.', 'success');
+      }
+    });
+    tokenClient.requestAccessToken({ prompt: 'consent' });
+  }
+
+  async function getLabelId(name) {
+    const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/labels', {
+      headers: { Authorization: 'Bearer ' + accessToken }
+    });
+    const data = await res.json();
+    const label = (data.labels || []).find(l => l.name.toLowerCase() === name.toLowerCase());
+    return label ? label.id : null;
+  }
+
+  async function fetchAllIds(labelId, after, before) {
+    let ids = [], pageToken = null;
+    const q = `after:${after} before:${before}`;
+    do {
+      let url = `https://gmail.googleapis.com/gmail/v1/users/me/messages?labelIds=${encodeURIComponent(labelId)}&q=${encodeURIComponent(q)}&maxResults=500`;
+      if (pageToken) url += '&pageToken=' + pageToken;
+      const res = await fetch(url, { headers: { Authorization: 'Bearer ' + accessToken } });
+      const data = await res.json();
+      if (data.messages) ids = ids.concat(data.messages.map(m => m.id));
+      pageToken = data.nextPageToken || null;
+    } while (pageToken);
+    return ids;
+  }
+
+  async function fetchSender(id) {
+    const res = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=metadata&metadataHeaders=From`, {
+      headers: { Authorization: 'Bearer ' + accessToken }
+    });
+    const data = await res.json();
+    const h = (data.payload?.headers || []).find(h => h.name === 'From');
+    return h ? h.value : null;
+  }
+
+  function parseEmail(str) {
+    if (!str) return null;
+    const m = str.match(/<(.+?)>/);
+    return (m ? m[1] : str).toLowerCase().trim();
+  }
+
+  async function handleSearch() {
+    if (!accessToken) { setStatus('Primero conectate con Google.', 'error'); return; }
+    const label = document.getElementById('labelInput').value.trim();
+    const from = document.getElementById('dateFrom').value;
+    const to = document.getElementById('dateTo').value;
+    if (!label || !from || !to) { setStatus('Completá todos los campos.', 'error'); return; }
+
+    const after = Math.floor(new Date(from).getTime() / 1000);
+    const before = Math.floor(new Date(to).getTime() / 1000);
+
+    document.getElementById('btnSearch').disabled = true;
+    document.getElementById('searchSpinner').style.display = 'block';
+    document.getElementById('btnSearchText').textContent = 'Buscando...';
+    document.getElementById('resultsCard').style.display = 'none';
+    allEmails = [];
+
+    setStatus('Buscando etiqueta "' + label + '"...', 'info');
+    const labelId = await getLabelId(label);
+    if (!labelId) {
+      setStatus('No se encontró la etiqueta "' + label + '". Verificá el nombre exacto.', 'error');
+      resetBtn(); return;
+    }
+
+    setStatus('Obteniendo lista de mensajes...', 'info');
+    const ids = await fetchAllIds(labelId, after, before);
+    if (!ids.length) {
+      setStatus('No hay mensajes en ese rango de fechas.', 'error');
+      resetBtn(); return;
+    }
+
+    const senders = new Set();
+    const batch = 20;
+    for (let i = 0; i < ids.length; i += batch) {
+      const slice = ids.slice(i, i + batch);
+      const results = await Promise.all(slice.map(id => fetchSender(id)));
+      results.forEach(f => { const e = parseEmail(f); if (e) senders.add(e); });
+      setStatus(`Procesando ${Math.min(i + batch, ids.length)} / ${ids.length} mensajes...`, 'info');
+    }
+
+    allEmails = Array.from(senders).sort();
+    document.getElementById('totalEmails').textContent = ids.length;
+    document.getElementById('uniqueEmails').textContent = allEmails.length;
+    document.getElementById('emailList').innerHTML = allEmails.map(e => `<div class="email-item">${e}</div>`).join('');
+    document.getElementById('resultsLabel').textContent = allEmails.length + ' remitentes únicos';
+    document.getElementById('resultsCard').style.display = 'block';
+    setStatus('Listo. ' + allEmails.length + ' remitentes únicos extraídos de ' + ids.length + ' mensajes.', 'success');
+    resetBtn();
+  }
+
+  function resetBtn() {
+    document.getElementById('btnSearch').disabled = false;
+    document.getElementById('searchSpinner').style.display = 'none';
+    document.getElementById('btnSearchText').textContent = 'Extraer remitentes';
+  }
+
+  function downloadCSV() {
+    if (!allEmails.length) return;
+    const csv = 'email\n' + allEmails.join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'remitentes_gmail.csv'; a.click();
+    URL.revokeObjectURL(url);
+  }
+</script>
+</body>
+</html>
