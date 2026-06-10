@@ -38,7 +38,7 @@
     padding: 3rem 1rem;
   }
 
-  .wrapper { width: 100%; max-width: 520px; }
+  .wrapper { width: 100%; max-width: 560px; }
 
   .logo {
     display: flex;
@@ -184,23 +184,40 @@
   .metric-num { font-size: 28px; font-weight: 600; letter-spacing: -0.04em; color: var(--text); }
   .metric-label { font-size: 12px; color: var(--muted); margin-top: 2px; }
 
-  .email-list {
+  .table-wrap {
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
-    max-height: 220px;
+    max-height: 260px;
     overflow-y: auto;
     background: var(--bg);
   }
 
-  .email-item {
-    padding: 8px 12px;
-    font-size: 13px;
-    color: var(--text);
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+
+  thead th {
+    position: sticky;
+    top: 0;
+    background: var(--surface);
     border-bottom: 1px solid var(--border);
-    font-family: 'SF Mono', 'Fira Mono', monospace;
+    padding: 8px 12px;
+    text-align: left;
+    font-weight: 600;
+    color: var(--muted);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
   }
 
-  .email-item:last-child { border-bottom: none; }
+  tbody td {
+    padding: 7px 12px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'SF Mono', 'Fira Mono', monospace;
+    font-size: 12px;
+  }
+
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover td { background: var(--surface); }
 
   .list-header {
     display: flex;
@@ -238,8 +255,8 @@
     </div>
   </div>
 
-  <h1>Extraer remitentes <span id="connectedBadge" style="display:none;" class="badge">✓ conectado</span></h1>
-  <p class="subtitle">Conectate con Gmail, elegí la etiqueta y el rango de fechas, y descargá el CSV con todos los remitentes únicos.</p>
+  <h1>Extraer destinatarios <span id="connectedBadge" style="display:none;" class="badge">✓ conectado</span></h1>
+  <p class="subtitle">Conectate con Gmail, elegí la etiqueta y el rango de fechas, y descargá el CSV con email y fecha/hora de cada mensaje.</p>
 
   <div class="card" id="authCard">
     <div class="card-title">1 — Autenticación</div>
@@ -269,7 +286,7 @@
       </div>
     </div>
     <button class="btn btn-primary" id="btnSearch" onclick="handleSearch()">
-      <span id="btnSearchText">Extraer remitentes</span>
+      <span id="btnSearchText">Extraer destinatarios</span>
       <div class="spinner" id="searchSpinner"></div>
     </button>
   </div>
@@ -287,13 +304,23 @@
       </div>
       <div class="metric">
         <div class="metric-num" id="uniqueEmails">0</div>
-        <div class="metric-label">remitentes únicos</div>
+        <div class="metric-label">destinatarios únicos</div>
       </div>
     </div>
     <div class="list-header">
-      <span id="resultsLabel">Remitentes encontrados</span>
+      <span id="resultsLabel">Destinatarios encontrados</span>
     </div>
-    <div class="email-list" id="emailList"></div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Email</th>
+            <th>Fecha y hora</th>
+          </tr>
+        </thead>
+        <tbody id="emailTableBody"></tbody>
+      </table>
+    </div>
     <button class="btn btn-success" onclick="downloadCSV()">
       Descargar CSV
     </button>
@@ -305,7 +332,7 @@
   const SCOPES = 'https://www.googleapis.com/auth/gmail.readonly';
   let tokenClient;
   let accessToken = null;
-  let allEmails = [];
+  let allRows = [];
 
   function setStatus(msg, type = 'info') {
     const el = document.getElementById('statusMsg');
@@ -325,7 +352,7 @@
         document.getElementById('connectedBadge').style.display = 'inline-flex';
         document.getElementById('authCard').classList.add('disabled');
         document.getElementById('searchCard').classList.remove('disabled');
-        setStatus('Autenticado correctamente. Configurá la búsqueda y extraé los remitentes.', 'success');
+        setStatus('Autenticado correctamente. Configurá la búsqueda y extraé los destinatarios.', 'success');
       }
     });
     tokenClient.requestAccessToken({ prompt: 'consent' });
@@ -354,19 +381,33 @@
     return ids;
   }
 
-  async function fetchSender(id) {
-    const res = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=metadata&metadataHeaders=From`, {
+  async function fetchMessage(id) {
+    const res = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=metadata&metadataHeaders=To&metadataHeaders=Date`, {
       headers: { Authorization: 'Bearer ' + accessToken }
     });
     const data = await res.json();
-    const h = (data.payload?.headers || []).find(h => h.name === 'From');
-    return h ? h.value : null;
+    const headers = data.payload?.headers || [];
+    const toHeader = headers.find(h => h.name === 'To');
+    const dateHeader = headers.find(h => h.name === 'Date');
+    return {
+      to: toHeader ? toHeader.value : null,
+      date: dateHeader ? dateHeader.value : null
+    };
   }
 
   function parseEmail(str) {
     if (!str) return null;
     const m = str.match(/<(.+?)>/);
     return (m ? m[1] : str).toLowerCase().trim();
+  }
+
+  function formatDate(dateStr) {
+    if (!dateStr) return '';
+    try {
+      const d = new Date(dateStr);
+      const pad = n => String(n).padStart(2, '0');
+      return `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    } catch { return dateStr; }
   }
 
   async function handleSearch() {
@@ -383,7 +424,7 @@
     document.getElementById('searchSpinner').style.display = 'block';
     document.getElementById('btnSearchText').textContent = 'Buscando...';
     document.getElementById('resultsCard').style.display = 'none';
-    allEmails = [];
+    allRows = [];
 
     setStatus('Buscando etiqueta "' + label + '"...', 'info');
     const labelId = await getLabelId(label);
@@ -399,38 +440,50 @@
       resetBtn(); return;
     }
 
-    const senders = new Set();
+    const seen = new Set();
     const batch = 20;
     for (let i = 0; i < ids.length; i += batch) {
       const slice = ids.slice(i, i + batch);
-      const results = await Promise.all(slice.map(id => fetchSender(id)));
-      results.forEach(f => { const e = parseEmail(f); if (e) senders.add(e); });
+      const results = await Promise.all(slice.map(id => fetchMessage(id)));
+      results.forEach(({ to, date }) => {
+        const email = parseEmail(to);
+        if (email && !seen.has(email)) {
+          seen.add(email);
+          allRows.push({ email, date: formatDate(date) });
+        }
+      });
       setStatus(`Procesando ${Math.min(i + batch, ids.length)} / ${ids.length} mensajes...`, 'info');
     }
 
-    allEmails = Array.from(senders).sort();
+    allRows.sort((a, b) => a.email.localeCompare(b.email));
+
     document.getElementById('totalEmails').textContent = ids.length;
-    document.getElementById('uniqueEmails').textContent = allEmails.length;
-    document.getElementById('emailList').innerHTML = allEmails.map(e => `<div class="email-item">${e}</div>`).join('');
-    document.getElementById('resultsLabel').textContent = allEmails.length + ' remitentes únicos';
+    document.getElementById('uniqueEmails').textContent = allRows.length;
+
+    const tbody = document.getElementById('emailTableBody');
+    tbody.innerHTML = allRows.map(r =>
+      `<tr><td>${r.email}</td><td>${r.date}</td></tr>`
+    ).join('');
+
+    document.getElementById('resultsLabel').textContent = allRows.length + ' destinatarios únicos';
     document.getElementById('resultsCard').style.display = 'block';
-    setStatus('Listo. ' + allEmails.length + ' remitentes únicos extraídos de ' + ids.length + ' mensajes.', 'success');
+    setStatus('Listo. ' + allRows.length + ' destinatarios únicos extraídos de ' + ids.length + ' mensajes.', 'success');
     resetBtn();
   }
 
   function resetBtn() {
     document.getElementById('btnSearch').disabled = false;
     document.getElementById('searchSpinner').style.display = 'none';
-    document.getElementById('btnSearchText').textContent = 'Extraer remitentes';
+    document.getElementById('btnSearchText').textContent = 'Extraer destinatarios';
   }
 
   function downloadCSV() {
-    if (!allEmails.length) return;
-    const csv = 'email\n' + allEmails.join('\n');
+    if (!allRows.length) return;
+    const csv = 'email,fecha_hora\n' + allRows.map(r => `${r.email},${r.date}`).join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = 'remitentes_gmail.csv'; a.click();
+    a.href = url; a.download = 'destinatarios_gmail.csv'; a.click();
     URL.revokeObjectURL(url);
   }
 </script>
